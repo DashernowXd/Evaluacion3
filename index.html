@@ -157,10 +157,20 @@
 				
 				setupSound();
 				
-			loadSound("./sounds/ugu.ogg");
-			render ();
+				
+				render ();
 				
 				window.addEventListener( 'resize', onWindowResize );
+
+				document.body.addEventListener('click', () => {
+			   	 if (context && context.state === 'suspended') {
+        			context.resume().then(() => {
+           		    console.log('AudioContext resumed');
+		            loadSound('/sounds/ugu.ogg');
+        			});
+  				  }
+				}, { once: true });
+
 
 
 		
@@ -339,6 +349,7 @@ for ( let iy = 0; iy < AMOUNTY; iy ++ ) {
 		</script>
 	</body>
 </html>
+
 
 
 
