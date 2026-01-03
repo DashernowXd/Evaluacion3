@@ -1,11 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<title>Waves y musica</title>
+		<title>three.js webgl - particles - waves</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		
 	</head>
 	<body>
+
+		<div id="info">
+			
 
 		<script type="x-shader/x-vertex" id="vertexshader">
 
@@ -13,7 +17,7 @@
 
 			void main() {
 
-				vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+				vec4 mvPosition = modelViewMatrix * vec4( position, 2.0 );
 
 				gl_PointSize = scale * ( 300.0 / - mvPosition.z );
 
@@ -22,6 +26,7 @@
 			}
 
 		</script>
+		<script src="../libs/chroma.min.js"></script>
 
 		<script type="x-shader/x-fragment" id="fragmentshader">
 
@@ -39,6 +44,7 @@
 
 		<!-- Import maps polyfill -->
 		<!-- Remove this when import maps will be widely supported -->
+		
 		<script type="importmap">
 			{
 				"imports": {
@@ -53,17 +59,7 @@
 			import * as THREE from 'three';
 
 			import Stats from 'three/addons/libs/stats.module.js';
-
-
-
-
-
-		
-		<script type="module">
-
-			import * as THREE from 'three';
-
-			import Stats from 'three/addons/libs/stats.module.js';
+			
 
 			const SEPARATION = 100, AMOUNTX = 50, AMOUNTY = 50;
 
@@ -76,30 +72,31 @@
 
 			let windowHalfX = window.innerWidth / 2;
 			let windowHalfY = window.innerHeight / 2;
-			
-			//Variables para el audio
-			var context;
-    		var sourceNode;
-    		var analyser;
-    		var analyser2;
 
+			
+			var context;
+			var sourceNode;
+			var analyser;
+			var analyser2;
+			var oscilator;
+			var source2;
+			var javascriptNode;
 
 			init();
 			animate();
+			
 
 			function init() {
 
 				container = document.createElement( 'div' );
 				document.body.appendChild( container );
 
-				camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 1, 10000 );
-				camera.position.x = 1200;
-				camera.position.z = 4000;
-				camera.position.y = 1200;
-				//camera.lookAt(scene.position);
-				
+				camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 10000 );
+				camera.position.z = 1000;
 
 				scene = new THREE.Scene();
+
+				//
 
 				const numParticles = AMOUNTX * AMOUNTY;
 
@@ -132,17 +129,19 @@
 				const material = new THREE.ShaderMaterial( {
 
 					uniforms: {
-						color: { value: new THREE.Color( 0xC9FC0B ) },
+						color: { value: new THREE.Color('white') },
 					},
 					vertexShader: document.getElementById( 'vertexshader' ).textContent,
 					fragmentShader: document.getElementById( 'fragmentshader' ).textContent
 
 				} );
 
+				//
 
 				particles = new THREE.Points( geometry, material );
-				particles.name = 'particles';
 				scene.add( particles );
+
+				//
 
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
 				renderer.setPixelRatio( window.devicePixelRatio );
@@ -152,16 +151,102 @@
 				stats = new Stats();
 				container.appendChild( stats.dom );
 
-
-				//
-
-				window.addEventListener( 'resize', onWindowResize );
+				container.style.touchAction = 'none';
+				container.addEventListener( 'pointermove', onPointerMove );
+				
 				
 				setupSound();
-				render();
+				
+			loadSound("ugu.ogg");
+			render ();
+				
+				window.addEventListener( 'resize', onWindowResize );
 
-				loadSound("ugu.ogg");
+
+		
+			
+
+			
+				
+
 			}
+
+			function setupSound() {
+                    if (! window.AudioContext) {
+                        if (! window.webkitAudioContext) {
+                            alert('no audiocontext found');
+                        }
+                        window.AudioContext = window.webkitAudioContext;
+                    }
+                    context = new AudioContext();
+					
+
+                    // setup a analyzer
+                    analyser = context.createAnalyser();
+                    analyser.smoothingTimeConstant = 0.4;
+                    analyser.fftSize = 1024;
+
+                    analyser2 = context.createAnalyser();
+                    analyser2.smoothingTimeConstant = 0.4;
+                    analyser2.fftSize = 1024;
+					
+
+
+                    // create a buffer source node
+                    sourceNode = context.createBufferSource();
+                    var splitter = context.createChannelSplitter();
+
+                    // connect the source to the analyser and the splitter
+                    sourceNode.connect(splitter);
+
+                    // connect one of the outputs from the splitter to
+                    // the analyser
+                    splitter.connect(analyser,0,0);
+                    splitter.connect(analyser2,0 , 0);
+					
+                    // and connect to destination
+                    sourceNode.connect(context.destination);
+					
+					
+
+					
+					
+					
+
+                    context = new AudioContext();
+                }
+                
+                function playSound(buffer) {
+                        sourceNode.buffer = buffer;
+                        sourceNode.start(0);
+                }
+
+                    // load the specified sound
+                function loadSound(url) {
+                        var request = new XMLHttpRequest();
+                        request.open('GET', url, true);
+                        request.responseType = 'arraybuffer';
+
+                        // When loaded decode the data
+                        request.onload = function() {
+
+                            // decode the data
+                            context.decodeAudioData(request.response, function(buffer) {
+                                // when the audio is decoded play the sound
+                                playSound(buffer);
+                            }, onError);
+                        }
+                        request.send();
+                }
+
+                function onError(e) {
+                    console.log(e);
+                }
+
+				
+
+
+		
 
 			function onWindowResize() {
 
@@ -175,156 +260,87 @@
 
 			}
 
+			//
+
+			function onPointerMove( event ) {
+
+				if ( event.isPrimary === false ) return;
+
+				mouseX = event.clientX - windowHalfX;
+				mouseY = event.clientY - windowHalfY;
+
+			}
+
+			//
+
 			function animate() {
 
 				requestAnimationFrame( animate );
 
 				render();
 				stats.update();
-
+				
 			}
+			
+			
+			
+			
+			
 
 			function render() {
 
-				var rotSpeed = 0.001;
-   	 			camera.position.x = camera.position.x * Math.cos(rotSpeed) + camera.position.z * Math.sin(rotSpeed);
-    			camera.position.z = camera.position.z * Math.cos(rotSpeed) - camera.position.x * Math.sin(rotSpeed);
+				camera.position.x += ( mouseX - camera.position.x ) * .05;
+				camera.position.y += ( - mouseY - camera.position.y ) * .05;
 				camera.lookAt( scene.position );
-
-				const positions = particles.geometry.attributes.position.array;
-				const scales = particles.geometry.attributes.scale.array;
-
-				let i = 0, j = 0;
-
-				for ( let ix = 0; ix < AMOUNTX; ix ++ ) {
-
-					for ( let iy = 0; iy < AMOUNTY; iy ++ ) {
-
-						positions[ i + 1 ] = ( Math.sin( ( ix + count ) * 0.3 ) * 50 ) + ( Math.sin( ( iy + count ) * 0.5 ) * 50 );
-
-						scales[ j ] = ( Math.sin( ( ix + count ) * 0.3 ) + 1 ) * 20 + ( Math.sin( ( iy + count ) * 0.5 ) + 1 ) * 20;
-
-						i += 3;
-						j ++;
-					}
-
-				}
-
-				particles.geometry.attributes.position.needsUpdate = true;
-				particles.geometry.attributes.scale.needsUpdate = true;
-
 				renderer.render( scene, camera );
+					updateWaves();
+			}
+				function updateWaves(){
+					var array= new Uint8Array(analyser.frequencyBinCount);
+					analyser.getByteTimeDomainData(array);
+						const scale= chroma.scale(['white', 'blue', 'red']).domain([0,20]);
+						var average;
+						var values=0;
+						const scales = particles.geometry.attributes.scale.array;
+						const position= particles.geometry.attributes.position.array;
+						let i = 0, j = 0, z=0;
+						for ( let ix = 0; ix < AMOUNTX; ix ++ ) {
+							
 
-				updateCubes();
-				
+for ( let iy = 0; iy < AMOUNTY; iy ++ ) {
+
+								scales[ j ] = ( Math.sin( ( ix + count ) * 0.3 ) + 1 ) * 20 +
+										( Math.sin( ( iy + count ) * 0.5 ) + 1 ) * 20;
+								position[i]=Math.abs(array[ix]-array[iy])*10;
+								particles.geometry.scale.y=average;
+								values+=array[i]
+								i += 3;
+								j ++;
+								z++;
+								average=values/20;
+	
+
+}
+
+}
+						
+
+
+				particles.geometry.attributes.scale.needsUpdate = true;
+				particles.geometry.attributes.position.needsUpdate = true;
 				count += 0.1;
-
-				//requestAnimationFrame(render);
 			}
 
+			
+			
 
-			function updateCubes() {
-        		// get the average for the first channel
-        		var array =  new Uint8Array(analyser.frequencyBinCount);
-        		analyser.getByteFrequencyData(array);
-        		var average = getAverageVolume(array);
-				
-
-        		// clear the current state
-        		if (scene.getObjectByName('particles')) {
-        		var ps = scene.getObjectByName('particles');
-        		//ps.scale.x = average / 20;
-        		//ps.scale.z = average / 20;
-				ps.scale.y = average / 20;
-				}
-    		}	
-
-
-
-			//Funciones para cargar el audio
-			function setupSound() {
-        		if (! window.AudioContext) {
-            		if (! window.webkitAudioContext) {
-                		alert('no audiocontext found');
-            		}
-            		window.AudioContext = window.webkitAudioContext;
-        		}
-        		context = new AudioContext();
-
-        		// setup a analyzer
-        		analyser = context.createAnalyser();
-        		analyser.smoothingTimeConstant = 0.4;
-        		analyser.fftSize = 1024;
-
-        		analyser2 = context.createAnalyser();
-        		analyser2.smoothingTimeConstant = 0.4;
-        		analyser2.fftSize = 1024;
-
-        		// create a buffer source node
-        		sourceNode = context.createBufferSource();
-        		var splitter = context.createChannelSplitter();
-
-        		// connect the source to the analyser and the splitter
-        		sourceNode.connect(splitter);
-
-        		// connect one of the outputs from the splitter to
-        		// the analyser
-        		splitter.connect(analyser,0);
-        		splitter.connect(analyser2,1);
-
-        		// and connect to destination
-        		sourceNode.connect(context.destination);
-
-        		context = new AudioContext();
-			}
-
-
-    		function getAverageVolume(array) {
-        		var values = 0;
-        		var average;
-
-        		var length = array.length;
-
-        		// get all the frequency amplitudes
-        		for (var i = 0; i < length; i++) {
-            	values += array[i];
-        		}
-
-        		average = values / length;
-        		return average;
-    		}
-
-    		function playSound(buffer) {
-        		sourceNode.buffer = buffer;
-        		sourceNode.start(0);
-    		}
-
-    		// load the specified sound
-    		function loadSound(url) {
-        		var request = new XMLHttpRequest();
-        		request.open('GET', url, true);
-        		request.responseType = 'arraybuffer';
-
-        		// When loaded decode the data
-        		request.onload = function() {
-
-            		// decode the data
-            		context.decodeAudioData(request.response, function(buffer) {
-                		// when the audio is decoded play the sound
-                		playSound(buffer);
-            		}, onError);
-        		}
-        		request.send();
-    		}
-
-    		function onError(e) {
-        		console.log(e);
-    		}
-
+			
 
 		</script>
 	</body>
 </html>
+
+
 
 
 
